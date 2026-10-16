@@ -1,3 +1,6 @@
+// GLSL Shaders Ecosystem // sevarchky.my.id
+// Overengineered 7-Spheres Celestial System, 35k GPU Curl Noise Swarm & Holographic Wireframes
+
 export const SIMPLEX_3D_CHUNK = /* glsl */ `
   vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
   vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -46,162 +49,333 @@ export const SIMPLEX_3D_CHUNK = /* glsl */ `
     m = m * m;
     return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
   }
-`;
 
-// Organic Amorphous Jelly Vertex Shader with dynamic touch ripples
-export const ORGANIC_JELLY_VERTEX_SHADER = /* glsl */ `
-  uniform float uTime;
-  uniform float uNoiseDensity;
-  uniform float uNoiseStrength;
-  uniform vec3 uRippleOrigin;
-  uniform float uRippleTime;
-  uniform float uRippleIntensity;
-  
-  varying vec3 vNormal;
-  varying vec3 vViewPosition;
-  varying vec3 vWorldPosition;
-  varying float vDisplacement;
+  // 3D Curl Noise: divergence-free vector field v = curl(psi)
+  vec3 curlNoise(vec3 p) {
+    const float e = 0.05;
+    float dx = snoise(p + vec3(e, 0.0, 0.0)) - snoise(p - vec3(e, 0.0, 0.0));
+    float dy = snoise(p + vec3(0.0, e, 0.0)) - snoise(p - vec3(0.0, e, 0.0));
+    float dz = snoise(p + vec3(0.0, 0.0, e)) - snoise(p - vec3(0.0, 0.0, e));
 
-  ${SIMPLEX_3D_CHUNK}
+    vec3 p1 = p + vec3(17.1, 31.7, 7.3);
+    float dx1 = snoise(p1 + vec3(e, 0.0, 0.0)) - snoise(p1 - vec3(e, 0.0, 0.0));
+    float dy1 = snoise(p1 + vec3(0.0, e, 0.0)) - snoise(p1 - vec3(0.0, e, 0.0));
+    float dz1 = snoise(p1 + vec3(0.0, 0.0, e)) - snoise(p1 - vec3(0.0, 0.0, e));
 
-  void main() {
-    vNormal = normalize(normalMatrix * normal);
-    vec3 pos = position;
-
-    // Continuous 3D domain simplex noise morphing
-    float slowTime = uTime * 0.45;
-    float n1 = snoise(pos * uNoiseDensity + vec3(0.0, slowTime * 0.5, slowTime * 0.3));
-    float n2 = snoise(pos * (uNoiseDensity * 1.8) - vec3(slowTime * 0.4, 0.0, slowTime * 0.2)) * 0.45;
-    float totalNoise = n1 + n2;
-
-    // Organic ripple pulse triggered by touch/click
-    float distToOrigin = distance(pos, uRippleOrigin);
-    float rippleWave = sin(distToOrigin * 6.0 - uRippleTime * 8.0);
-    float rippleDamp = exp(-distToOrigin * 1.5) * exp(-uRippleTime * 2.2);
-    float ripple = rippleWave * rippleDamp * uRippleIntensity;
-
-    float displacement = (totalNoise * uNoiseStrength) + ripple;
-    vDisplacement = displacement;
-    pos += normal * displacement;
-
-    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-    vViewPosition = -mvPosition.xyz;
-    vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
-    gl_Position = projectionMatrix * mvPosition;
+    return normalize(vec3(
+      dy1 - dz,
+      dz1 - dx,
+      dx1 - dy
+    ));
   }
 `;
 
-// Thin-Film Pearlescent Chromatic Jelly Fragment Shader
-export const ORGANIC_JELLY_FRAGMENT_SHADER = /* glsl */ `
-  uniform vec3 uBaseColor;
-  uniform vec3 uFresnelColor;
-  uniform vec3 uSecondaryColor;
-  uniform float uTime;
+// ==========================================
+// 1. CELESTIAL SHADER (7-Spheres InstancedMesh)
+// ==========================================
+export const CelestialShader = {
+  uniforms: {
+    uTime: { value: 0 },
+    uAudioBands: { value: [0, 0, 0, 0] }, // [low, mid, high, energy]
+    uNoiseDensity: { value: 1.4 },
+    uNoiseStrength: { value: 0.35 },
+  },
+  vertexShader: /* glsl */ `
+    uniform float uTime;
+    uniform vec4 uAudioBands; // x: low, y: mid, z: high, w: energy
+    uniform float uNoiseDensity;
+    uniform float uNoiseStrength;
 
-  varying vec3 vNormal;
-  varying vec3 vViewPosition;
-  varying vec3 vWorldPosition;
-  varying float vDisplacement;
+    attribute float aPersonaId;
+    attribute vec3 aPrimaryColor;
+    attribute vec3 aSecondaryColor;
+    attribute vec4 aPersonaParams; // x: noise density, y: amp, z: metalness, w: unlocked
+    attribute float aFocusProgress;
 
-  void main() {
-    vec3 normal = normalize(vNormal);
-    vec3 viewDir = normalize(vViewPosition);
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vWorldPosition;
+    varying float vFresnel;
+    varying float vPersonaId;
+    varying vec3 vPrimaryColor;
+    varying vec3 vSecondaryColor;
+    varying vec4 vPersonaParams;
+    varying float vFocusProgress;
+    varying float vDisplacement;
 
-    // High-order smooth Fresnel curve
-    float NdotV = clamp(dot(normal, viewDir), 0.0, 1.0);
-    float fresnel = pow(1.0 - NdotV, 3.2);
+    ${SIMPLEX_3D_CHUNK}
 
-    // Thin-film iridescent chromatic dispersion
-    float chromaticPhase = NdotV * 3.14159 + (vDisplacement * 2.5) + (uTime * 0.2);
-    vec3 iridescentColor;
-    iridescentColor.r = sin(chromaticPhase) * 0.5 + 0.5;
-    iridescentColor.g = sin(chromaticPhase + 2.094) * 0.5 + 0.5; // +120 deg
-    iridescentColor.b = sin(chromaticPhase + 4.188) * 0.5 + 0.5; // +240 deg
+    void main() {
+      vPersonaId = aPersonaId;
+      vPrimaryColor = aPrimaryColor;
+      vSecondaryColor = aSecondaryColor;
+      vPersonaParams = aPersonaParams;
+      vFocusProgress = aFocusProgress;
 
-    // Blend between primary base, pearlescent glow, and secondary chromatic hue
-    vec3 softPearlescent = mix(uFresnelColor, uSecondaryColor, iridescentColor.g);
-    vec3 surface = mix(uBaseColor, softPearlescent, fresnel * 0.85);
+      // Transform normal with instance matrix
+      mat3 normMatrix = transpose(inverse(mat3(modelMatrix * instanceMatrix)));
+      vNormal = normalize(normMatrix * normal);
 
-    // Dual soft specular highlights (moonstone glint)
-    vec3 lightDir1 = normalize(vec3(1.2, 2.0, 1.8));
-    vec3 lightDir2 = normalize(vec3(-1.5, -1.0, 0.8));
-    
-    vec3 half1 = normalize(lightDir1 + viewDir);
-    vec3 half2 = normalize(lightDir2 + viewDir);
-    
-    float spec1 = pow(max(dot(normal, half1), 0.0), 40.0) * 0.65;
-    float spec2 = pow(max(dot(normal, half2), 0.0), 24.0) * 0.35;
+      vec3 pos = position;
 
-    vec3 finalGlow = surface + vec3(spec1 + spec2) * (uFresnelColor * 0.5 + 0.5);
-    gl_FragColor = vec4(finalGlow, 0.94);
-  }
-`;
+      // Dynamic Simplex noise displacement modulated by audio sub-bass (x) and mid harmonics (y)
+      float density = uNoiseDensity * aPersonaParams.x;
+      float amp = uNoiseStrength * aPersonaParams.y * (1.0 + uAudioBands.x * 0.7);
+      float slowTime = uTime * (0.35 + aPersonaParams.y * 0.2);
+      
+      float n = snoise(pos * density + vec3(slowTime * 0.4, slowTime * 0.2, aPersonaId * 2.1));
+      float displacement = n * amp;
+      vDisplacement = displacement;
+      pos += normal * displacement;
 
-// 15,000 Bioluminescent Deep-Sea Spores Vertex Shader
-export const BIO_SPORE_VERTEX_SHADER = /* glsl */ `
-  uniform float uTime;
-  uniform vec3 uPointer;
-  uniform float uRippleTime;
-  uniform float uRippleIntensity;
-  attribute float aScale;
-  attribute float aPhase;
+      // Scale up slightly when focused
+      pos *= (1.0 + aFocusProgress * 0.35);
 
-  varying float vAlpha;
-  varying vec3 vColor;
+      vec4 worldPos = modelMatrix * instanceMatrix * vec4(pos, 1.0);
+      vWorldPosition = worldPos.xyz;
 
-  uniform vec3 uColorA;
-  uniform vec3 uColorB;
+      vec4 mvPosition = viewMatrix * worldPos;
+      vViewPosition = -mvPosition.xyz;
 
-  void main() {
-    vec3 pos = position;
+      // Compute Fresnel term in vertex stage for performance
+      vec3 viewDir = normalize(-mvPosition.xyz);
+      float NdotV = clamp(dot(vNormal, viewDir), 0.0, 1.0);
+      vFresnel = pow(1.0 - NdotV, 3.2);
 
-    // Harmonic floating ocean wave drift
-    float t = uTime * 0.6 + aPhase;
-    pos.x += sin(t * 1.2 + pos.y * 0.3) * 0.65;
-    pos.y += cos(t * 0.9 + pos.x * 0.4) * 0.55;
-    pos.z += sin(t * 1.5 + pos.z * 0.2) * 0.45;
-
-    // Gentle repulsion from touch/pointer
-    float dist = distance(pos.xy, uPointer.xy);
-    if (dist < 4.5) {
-      vec2 pushDir = normalize(pos.xy - uPointer.xy);
-      pos.xy += pushDir * (4.5 - dist) * 0.85;
+      gl_Position = projectionMatrix * mvPosition;
     }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform float uTime;
+    uniform vec4 uAudioBands;
 
-    // Ripple expansion impulse
-    if (uRippleIntensity > 0.0 && uRippleTime < 2.0) {
-      float rDist = length(pos);
-      float shock = sin(rDist * 4.0 - uRippleTime * 6.0) * exp(-uRippleTime * 1.5);
-      pos += normalize(pos) * (shock * uRippleIntensity * 1.8);
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+    varying vec3 vWorldPosition;
+    varying float vFresnel;
+    varying float vPersonaId;
+    varying vec3 vPrimaryColor;
+    varying vec3 vSecondaryColor;
+    varying vec4 vPersonaParams;
+    varying float vFocusProgress;
+    varying float vDisplacement;
+
+    void main() {
+      vec3 normal = normalize(vNormal);
+      vec3 viewDir = normalize(vViewPosition);
+
+      // Iridescent chromatic dispersion phase
+      float chromaticPhase = vFresnel * 3.14159 + (vDisplacement * 2.0) + (uTime * 0.2);
+      vec3 iridColor = vec3(
+        sin(chromaticPhase) * 0.5 + 0.5,
+        sin(chromaticPhase + 2.094) * 0.5 + 0.5,
+        sin(chromaticPhase + 4.188) * 0.5 + 0.5
+      );
+
+      // Blend primary base with secondary accent via Fresnel
+      vec3 core = mix(vPrimaryColor, vSecondaryColor, iridColor.g * 0.6);
+      vec3 surface = mix(core, vSecondaryColor, vFresnel * 0.85);
+
+      // Specular highlights
+      vec3 lightDir = normalize(vec3(1.2, 2.0, 1.5));
+      vec3 halfVec = normalize(lightDir + viewDir);
+      float spec = pow(max(dot(normal, halfVec), 0.0), 32.0) * (0.4 + vPersonaParams.z * 0.6);
+
+      // Audio high band scintillation
+      float sparkle = uAudioBands.z * 0.3;
+      vec3 finalColor = surface + (spec + sparkle) * (vSecondaryColor * 0.5 + 0.5);
+
+      // Branchless alpha (preserves early-Z for TBDR)
+      gl_FragColor = vec4(finalColor, 0.94);
     }
+  `
+};
 
-    vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
-    gl_PointSize = aScale * (24.0 / -mvPosition.z);
-    gl_Position = projectionMatrix * mvPosition;
+// ==========================================
+// 2. 35,000 GPU CURL NOISE PARTICLE SWARM
+// ==========================================
+export const CurlParticleShader = {
+  uniforms: {
+    uTime: { value: 0 },
+    uAudioBands: { value: [0, 0, 0, 0] },
+    uMouse: { value: [0, 0, 0] },
+    uWarpTime: { value: 99.0 },
+    uWarpPower: { value: 0.0 },
+    uColorA: { value: [0.84, 0.70, 0.99] }, // Froerybell lavender
+    uColorB: { value: [0.0, 0.94, 1.0] },    // Sevarchky cyan
+  },
+  vertexShader: /* glsl */ `
+    uniform float uTime;
+    uniform vec4 uAudioBands; // low, mid, high, energy
+    uniform vec3 uMouse;
+    uniform float uWarpTime;
+    uniform float uWarpPower;
+    uniform vec3 uColorA;
+    uniform vec3 uColorB;
 
-    // Color gradient across spore depth
-    float mixFactor = sin(aPhase + uTime * 0.3) * 0.5 + 0.5;
-    vColor = mix(uColorA, uColorB, mixFactor);
-    vAlpha = clamp(0.35 + sin(t * 2.0) * 0.25, 0.2, 0.95);
-  }
-`;
+    attribute float aScale;
+    attribute float aPhase;
 
-// TBDR-Compliant Branchless Spore Fragment Shader (Zero Discard for 120 FPS)
-export const BIO_SPORE_FRAGMENT_SHADER = /* glsl */ `
-  varying float vAlpha;
-  varying vec3 vColor;
+    varying float vAlpha;
+    varying vec3 vColor;
 
-  void main() {
-    float dist = length(gl_PointCoord - vec2(0.5));
-    // Soft gaussian-like circular glow without discard
-    float intensity = clamp(0.5 - dist, 0.0, 1.0) * 2.0;
-    intensity = intensity * intensity * intensity; // Smooth cubic falloff
+    ${SIMPLEX_3D_CHUNK}
 
-    gl_FragColor = vec4(vColor * (intensity * vAlpha), intensity * vAlpha);
-  }
-`;
+    void main() {
+      vec3 pos = position;
 
-// Backward-compatibility aliases
+      // 3D Divergence-free Curl Noise flowfield
+      float flowTime = uTime * 0.25 + aPhase;
+      vec3 curl = curlNoise(pos * 0.12 + vec3(0.0, flowTime * 0.3, flowTime * 0.15));
+      pos += curl * (0.85 + uAudioBands.x * 0.6);
+
+      // Pointer magnetic vortex
+      float mouseDist = distance(pos.xy, uMouse.xy);
+      if (mouseDist < 5.0) {
+        vec2 toMouse = pos.xy - uMouse.xy;
+        // Tangential curl force
+        vec2 tangent = vec2(-toMouse.y, toMouse.x);
+        float falloff = (5.0 - mouseDist) / 5.0;
+        pos.xy += normalize(tangent) * falloff * 0.95;
+        // Radial repulsion
+        pos.xy += normalize(toMouse) * falloff * 0.5;
+      }
+
+      // Spherical shockwave impulse wave shell (from warp trigger)
+      if (uWarpPower > 0.0 && uWarpTime < 2.5) {
+        float r = length(pos);
+        float waveDist = abs(r - uWarpTime * 6.0);
+        float shock = exp(-waveDist * 1.2) * exp(-uWarpTime * 1.4) * uWarpPower;
+        pos += normalize(pos) * (shock * 2.5);
+      }
+
+      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      
+      // Dynamic point size scaling with high-frequency audio sparkles
+      float sizeMod = aScale * (1.0 + uAudioBands.z * 1.2);
+      gl_PointSize = sizeMod * (26.0 / -mvPosition.z);
+      gl_Position = projectionMatrix * mvPosition;
+
+      // Palette mix based on depth and phase
+      float mixT = sin(aPhase + uTime * 0.4) * 0.5 + 0.5;
+      vColor = mix(uColorA, uColorB, mixT);
+      vAlpha = clamp(0.35 + sin(flowTime * 2.0) * 0.25 + uAudioBands.w * 0.3, 0.2, 0.95);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    varying float vAlpha;
+    varying vec3 vColor;
+
+    void main() {
+      float dist = length(gl_PointCoord - vec2(0.5));
+      // Branchless soft circular falloff without alpha kill (TBDR early-Z compliant)
+      float intensity = clamp(0.5 - dist, 0.0, 1.0) * 2.0;
+      intensity = intensity * intensity * intensity;
+
+      gl_FragColor = vec4(vColor * (intensity * vAlpha), intensity * vAlpha);
+    }
+  `
+};
+
+// ==========================================
+// 3. HOLOGRAPHIC EXPLODED WIREFRAME SHADER
+// ==========================================
+export const HolographicWireframeShader = {
+  uniforms: {
+    uTime: { value: 0 },
+    uExplodeProgress: { value: 0.0 }, // 0.0 -> 1.0
+    uAccentColor: { value: [0.0, 0.94, 1.0] },
+    uSubsystemOffset: { value: [0, 0, 0] },
+  },
+  vertexShader: /* glsl */ `
+    uniform float uTime;
+    uniform float uExplodeProgress;
+    uniform vec3 uSubsystemOffset;
+
+    attribute vec3 aBarycentric;
+    varying vec3 vBarycentric;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+
+    void main() {
+      vBarycentric = aBarycentric;
+      vNormal = normalize(normalMatrix * normal);
+
+      vec3 pos = position;
+      // Explode along subsystem displacement vector
+      pos += uSubsystemOffset * uExplodeProgress;
+
+      vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+      vViewPosition = -mvPosition.xyz;
+      gl_Position = projectionMatrix * mvPosition;
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform float uTime;
+    uniform vec3 uAccentColor;
+
+    varying vec3 vBarycentric;
+    varying vec3 vNormal;
+    varying vec3 vViewPosition;
+
+    void main() {
+      // Single-pass barycentric edge distance calculation
+      float edge = min(min(vBarycentric.x, vBarycentric.y), vBarycentric.z);
+      float wireframe = 1.0 - smoothstep(0.0, 0.045, edge);
+
+      vec3 viewDir = normalize(vViewPosition);
+      float fresnel = pow(1.0 - clamp(dot(normalize(vNormal), viewDir), 0.0, 1.0), 2.0);
+
+      vec3 color = uAccentColor * (wireframe * 0.9 + fresnel * 0.35);
+      float alpha = clamp(wireframe + fresnel * 0.5, 0.1, 0.95);
+
+      gl_FragColor = vec4(color, alpha);
+    }
+  `
+};
+
+// ==========================================
+// 4. BEZIER CONDUIT TELEMETRY PULSE SHADER
+// ==========================================
+export const ConduitShader = {
+  uniforms: {
+    uTime: { value: 0 },
+    uPulseSpeed: { value: 2.5 },
+    uConduitColor: { value: [0.0, 1.0, 0.4] },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform float uTime;
+    uniform float uPulseSpeed;
+    uniform vec3 uConduitColor;
+    varying vec2 vUv;
+
+    void main() {
+      // Moving dashed telemetry pulse along spline length
+      float pulse = fract(vUv.x * 6.0 - uTime * uPulseSpeed);
+      float beam = smoothstep(0.7, 0.98, pulse);
+      float baseLine = 0.25;
+
+      vec3 color = uConduitColor * (baseLine + beam * 0.85);
+      gl_FragColor = vec4(color, baseLine + beam * 0.7);
+    }
+  `
+};
+
+// ==========================================
+// BACKWARD-COMPATIBLE EXPORTS & ALIASES
+// ==========================================
+export const ORGANIC_JELLY_VERTEX_SHADER = CelestialShader.vertexShader;
+export const ORGANIC_JELLY_FRAGMENT_SHADER = CelestialShader.fragmentShader;
+export const BIO_SPORE_VERTEX_SHADER = CurlParticleShader.vertexShader;
+export const BIO_SPORE_FRAGMENT_SHADER = CurlParticleShader.fragmentShader;
+
 export const MONOLITH_VERTEX_SHADER = ORGANIC_JELLY_VERTEX_SHADER;
 export const MONOLITH_FRAGMENT_SHADER = ORGANIC_JELLY_FRAGMENT_SHADER;
 export const PARTICLE_VERTEX_SHADER = BIO_SPORE_VERTEX_SHADER;

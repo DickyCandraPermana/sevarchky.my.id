@@ -1,7 +1,67 @@
 // Pure Web Audio API Synthesizer — Ethereal Organic Harmonics & Crystal Bowls
+// Role: The Sovereign Sentry // OMEGA Audio Architecture
+
+export interface FFTConfig {
+  fftSize: number;
+  frequencyBinCount: number;
+  minDecibels: number;
+  maxDecibels: number;
+  smoothingTimeConstant: number;
+}
+
+export const FFT_CONFIG: FFTConfig = {
+  fftSize: 1024,
+  frequencyBinCount: 512,
+  minDecibels: -90,
+  maxDecibels: -10,
+  smoothingTimeConstant: 0.85
+};
+
+export const SOLFEGGIO_FREQUENCIES: Record<string, number> = {
+  FROERYBELL: 432,   // Cosmic Grounding & Harmonic Alignment
+  THEARINAZS: 528,   // Transformation & Miracles
+  SEVARCHKY: 639,    // System Interconnectivity
+  LOAFINEST: 174,    // Natural Foundation & Grounding
+  AETHELGARD: 741,   // Awakening Intuition & Cleansing Leaks
+  MORPHIUS_V: 852,   // High-Dimensional Vector Turbulence
+  ASTRALNOX: 963     // Crown Singularity Transcendence
+};
+
+/**
+ * Calculates dual-chorus detuning harmonics for crystal singing bowls:
+ * Fundamental tone f and perfect fifth f * 1.503 producing microtonal beating.
+ */
+export function calculateHarmonicDetune(freq: number): {
+  fundamental: number;
+  fifth: number;
+  beatFreq: number;
+} {
+  const fifth = freq * 1.503;
+  const beatFreq = Math.abs(fifth - freq * 1.5);
+  return {
+    fundamental: freq,
+    fifth,
+    beatFreq
+  };
+}
+
+/**
+ * Validates Web Audio FFT analyzer node parameters against spec.
+ */
+export function validateFFTConfig(config: FFTConfig): boolean {
+  // FFT size must be power of two between 32 and 32768
+  const isPowerOfTwo = (config.fftSize & (config.fftSize - 1)) === 0;
+  const validSize = isPowerOfTwo && config.fftSize >= 32 && config.fftSize <= 32768;
+  const validBin = config.frequencyBinCount === config.fftSize / 2;
+  const validSmoothing = config.smoothingTimeConstant >= 0 && config.smoothingTimeConstant <= 1;
+  const validDecibels = config.minDecibels < config.maxDecibels;
+
+  return validSize && validBin && validSmoothing && validDecibels;
+}
 
 class EtherealAudioEngine {
   private ctx: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
   public isMuted: boolean = false;
   private isUnlocked: boolean = false;
 
@@ -13,7 +73,29 @@ class EtherealAudioEngine {
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     if (AudioCtxClass) {
       this.ctx = new AudioCtxClass();
+      try {
+        this.analyser = this.ctx.createAnalyser();
+        this.analyser.fftSize = FFT_CONFIG.fftSize;
+        this.analyser.smoothingTimeConstant = FFT_CONFIG.smoothingTimeConstant;
+        this.analyser.minDecibels = FFT_CONFIG.minDecibels;
+        this.analyser.maxDecibels = FFT_CONFIG.maxDecibels;
+        this.analyser.connect(this.ctx.destination);
+      } catch {}
     }
+  }
+
+  public getAnalyser(): AnalyserNode | null {
+    if (!this.analyser) {
+      this.initContext();
+    }
+    return this.analyser;
+  }
+
+  public getFFTData(): Uint8Array | null {
+    if (!this.analyser) return null;
+    const data = new Uint8Array(this.analyser.frequencyBinCount);
+    this.analyser.getByteFrequencyData(data);
+    return data;
   }
 
   public unlock() {
@@ -48,7 +130,11 @@ class EtherealAudioEngine {
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      if (this.analyser) {
+        gain.connect(this.analyser);
+      } else {
+        gain.connect(this.ctx.destination);
+      }
 
       osc.onended = () => {
         osc.disconnect();
@@ -72,12 +158,14 @@ class EtherealAudioEngine {
       const osc2 = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
 
+      const detune = calculateHarmonicDetune(freq);
+
       // Dual detuned oscillators for singing bowl chorus beating
       osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(freq, now);
+      osc1.frequency.setValueAtTime(detune.fundamental, now);
 
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(freq * 1.503, now); // Sweet fifth harmonic
+      osc2.frequency.setValueAtTime(detune.fifth, now); // Sweet fifth harmonic
 
       gain.gain.setValueAtTime(0.0001, now);
       gain.gain.exponentialRampToValueAtTime(0.08, now + 0.12);
@@ -85,7 +173,12 @@ class EtherealAudioEngine {
 
       osc1.connect(gain);
       osc2.connect(gain);
-      gain.connect(this.ctx.destination);
+
+      if (this.analyser) {
+        gain.connect(this.analyser);
+      } else {
+        gain.connect(this.ctx.destination);
+      }
 
       osc1.onended = () => {
         osc1.disconnect();
@@ -124,7 +217,11 @@ class EtherealAudioEngine {
         gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.045 + 0.45);
 
         osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        if (this.analyser) {
+          gain.connect(this.analyser);
+        } else {
+          gain.connect(this.ctx.destination);
+        }
 
         osc.onended = () => {
           osc.disconnect();
@@ -138,7 +235,7 @@ class EtherealAudioEngine {
   }
 
   // Backward compatibility alias for blip
-  public playBlip(freq: number = 880, duration: number = 0.05) {
+  public playBlip(freq: number = 880) {
     this.playRipple(freq);
   }
 
