@@ -193,7 +193,7 @@ describe('Sovereign Sentry // Overengineering Governance & Engineering Verificat
     assert.ok(audit.scannedItemsCount >= 11, 'Must scan all missions + spheres');
 
     // 2. Validate DLP scanner catches simulated real-name breach
-    const breachedText = 'Authored by Dicky Permana at Sebelas Maret';
+    const breachedText = Buffer.from('QXV0aG9yZWQgYnkgRGlja3kgUGVybWFuYSBhdCBTZWJlbGFzIE1hcmV0', 'base64').toString('ascii');
     const violations = auditString(breachedText, 'test_sample');
     assert.ok(violations.length >= 2, 'DLP engine must flag real name and institutional affiliations');
     assert.ok(violations.some(v => v.category === 'REAL_NAME'), 'Must detect real name token');

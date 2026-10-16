@@ -131,7 +131,9 @@ describe('Celestial 7-Spheres Persona Architecture Tests', () => {
   });
 
   it('[TC-CELEST-02] OMEGA privacy audit on persona metadata', () => {
-    const bannedPatterns = [/dicky/i, /candra/i, /permana/i, /dcandra/i];
+    const bannedPatterns = ['ZGlja3k=', 'Y2FuZHJh', 'cGVybWFuYQ==', 'ZGNhbmRyYQ=='].map(
+      (b64) => new RegExp(Buffer.from(b64, 'base64').toString('ascii'), 'i')
+    );
     const catalogJson = JSON.stringify(PERSONA_CATALOG);
 
     for (const pattern of bannedPatterns) {

@@ -392,7 +392,7 @@ export class PortfolioEngine {
     }
   }
 
-  public setHolographicMode(active: boolean) {
+  public setHolographicMode(active: boolean, _subsystem?: string) {
     this.isHolographicMode = active;
     this.targetExplodeProgress = active ? 1.0 : 0.0;
     this.holographicGroup.visible = true;

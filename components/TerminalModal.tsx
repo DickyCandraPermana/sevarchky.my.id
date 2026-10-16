@@ -136,7 +136,7 @@ export function TerminalModal({ isOpen, onClose, telemetry, onAction }: Terminal
         {/* Quick Command Bar */}
         <div className="flex flex-wrap items-center gap-1.5 px-5 py-2.5 bg-white/[0.015] border-b border-white/[0.06] text-[11px]">
           <span className="text-zinc-500 uppercase mr-1 text-[10px] tracking-wider">Presets:</span>
-          {['/help', '/telemetry', '/warp', '/palette mint', '/palette rose', '/mission keyhub'].map((cmd) => (
+          {['/help', '/orbit sevarchky', '/orbit thearinazs', '/freq 528', '/warp', '/matrix', '/benchmark', '/dlp:audit'].map((cmd) => (
             <button
               key={cmd}
               type="button"

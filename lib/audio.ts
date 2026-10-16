@@ -291,6 +291,26 @@ class EtherealAudioEngine {
     this.playChime();
   }
 
+  public setEnabled(enabled: boolean) {
+    this.isMuted = !enabled;
+    if (enabled) {
+      this.unlock();
+    }
+  }
+
+  public playTone(freq: number, _duration: number = 1.2) {
+    this.playCrystalBowl(freq);
+  }
+
+  public playBowl(freq: number = 432) {
+    this.playCrystalBowl(freq);
+  }
+
+  public playShockwave() {
+    this.playRipple(120);
+    this.playCrystalBowl(174);
+  }
+
   public toggleMute(): boolean {
     this.isMuted = !this.isMuted;
     return this.isMuted;

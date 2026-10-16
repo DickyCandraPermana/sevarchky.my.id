@@ -2,21 +2,28 @@
 
 import { useEffect, useRef } from 'react';
 import { PortfolioEngine, EngineTelemetry } from '../lib/engine.ts';
+import { SphereData } from '../lib/spheres.ts';
+import { cyberAudio } from '../lib/audio.ts';
 
 interface PortfolioCanvasProps {
   onTelemetry?: (telemetry: EngineTelemetry) => void;
   engineRef?: React.MutableRefObject<PortfolioEngine | null>;
+  onSphereSelect?: (sphere: SphereData) => void;
 }
 
-export function PortfolioCanvas({ onTelemetry, engineRef }: PortfolioCanvasProps) {
+export function PortfolioCanvas({ onTelemetry, engineRef, onSphereSelect }: PortfolioCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     if (!canvasRef.current) return;
 
     const engine = new PortfolioEngine(canvasRef.current, {
-      onTelemetry
+      onTelemetry,
+      onSphereSelect
     });
+
+    // Zero-heap Web Audio Analyser Uniforms Bridge
+    engine.setAudioAnalyzer(cyberAudio);
 
     if (engineRef) {
       engineRef.current = engine;
@@ -28,7 +35,7 @@ export function PortfolioCanvas({ onTelemetry, engineRef }: PortfolioCanvasProps
         engineRef.current = null;
       }
     };
-  }, [onTelemetry, engineRef]);
+  }, [onTelemetry, engineRef, onSphereSelect]);
 
   return (
     <canvas

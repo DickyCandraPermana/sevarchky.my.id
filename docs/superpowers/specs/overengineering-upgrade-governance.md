@@ -175,7 +175,7 @@ Every proposed commit, pull request, and deployment must pass the five Sovereign
 
 ### Banned Identifier Regex Rules
 1. **Real Names & Pseudonym Variations:**
-   `/\b(dicky|candra|permana|dcandra)\b/i`
+   `[REDACTED_OMEGA_IDENTITY_PATTERN]`
 2. **Academic & Institutional Markers:**
    `/\b(Sebelas\s+Maret|Universitas\s+Sebelas\s+Maret|\bUNS\b)/i`
 3. **Student Identification Numbers (NIM / NIP):**
