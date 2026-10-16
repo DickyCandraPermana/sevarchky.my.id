@@ -1,6 +1,17 @@
 // Pure Web Audio API Synthesizer — Ethereal Organic Harmonics & Crystal Bowls
 // Role: The Sovereign Sentry // OMEGA Audio Architecture
 
+export interface AudioBands {
+  low: number;
+  mid: number;
+  high: number;
+  energy: number;
+}
+
+export interface IAudioAnalyzerProvider {
+  getAudioBands(target: AudioBands): void;
+}
+
 export interface FFTConfig {
   fftSize: number;
   frequencyBinCount: number;
@@ -96,6 +107,38 @@ class EtherealAudioEngine {
     const data = new Uint8Array(this.analyser.frequencyBinCount);
     this.analyser.getByteFrequencyData(data);
     return data;
+  }
+
+  private freqDataScratch: Uint8Array | null = null;
+
+  public getAudioBands(target: AudioBands): void {
+    if (!this.analyser) {
+      target.low = 0; target.mid = 0; target.high = 0; target.energy = 0;
+      return;
+    }
+    const binCount = this.analyser.frequencyBinCount;
+    if (!this.freqDataScratch || this.freqDataScratch.length !== binCount) {
+      this.freqDataScratch = new Uint8Array(binCount);
+    }
+    this.analyser.getByteFrequencyData(this.freqDataScratch as any);
+
+    // Compute spectral energy across frequency bins without GC allocations
+    let lowSum = 0;
+    const lowEnd = Math.min(16, binCount);
+    for (let i = 0; i < lowEnd; i++) lowSum += this.freqDataScratch[i];
+
+    let midSum = 0;
+    const midEnd = Math.min(80, binCount);
+    for (let i = 16; i < midEnd; i++) midSum += this.freqDataScratch[i];
+
+    let highSum = 0;
+    const highEnd = Math.min(256, binCount);
+    for (let i = 80; i < highEnd; i++) highSum += this.freqDataScratch[i];
+
+    target.low = lowEnd > 0 ? lowSum / (lowEnd * 255) : 0;
+    target.mid = midEnd > 16 ? midSum / ((midEnd - 16) * 255) : 0;
+    target.high = highEnd > 80 ? highSum / ((highEnd - 80) * 255) : 0;
+    target.energy = (target.low * 0.5 + target.mid * 0.3 + target.high * 0.2);
   }
 
   public unlock() {
