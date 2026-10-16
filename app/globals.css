@@ -1,0 +1,48 @@
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Syne:wght@700;800&display=swap");
+@import "tailwindcss";
+
+:root {
+  --background: #080612;
+  --foreground: #ededed;
+  --accent-purple: #d8b4fe;
+  --accent-mint: #6ee7b7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background-color: #080612;
+  color: #ededed;
+  font-family: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+.font-mono {
+  font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.font-display {
+  font-family: "Syne", sans-serif;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f1a30;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3b325c;
+}
